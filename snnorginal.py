@@ -87,26 +87,32 @@ class SNN:
 		'''
 		Layer-wise training of the network for a given training set.
 		'''
-		# train first layer
-		l1_updates = np.zeros(self._layer_1_thresholds.shape, dtype=np.int32)
+		l1_updates = np.zeros(( layer_1_epochs, self._layer_1_thresholds.shape[0]), dtype=np.int32)
+		l1_weights_updates = np.zeros((layer_1_epochs, self._layer_1_weights.shape[1]), dtype=np.int32)
+		l1_threshold_updates = np.zeros((layer_1_epochs, self._layer_1_weights.shape[1]), dtype=np.int32)
+    
 		for i in range(layer_1_epochs):
+			l1_old_weights  = self._layer_1_weights.copy()
+			l1_old_thresholds = self._layer_1_thresholds.copy()
+            
 			for sample in input_data:
 				# Compute active neurons (i.e. neurons that spike)
 				activations = np.dot(sample.reshape((sample.shape[0]*sample.shape[1],)), self._layer_1_weights)
 				actives = np.where(activations > self._layer_1_thresholds)[0]
 				if len(actives) > 0:
 					# Winner-takes-all: active neuron with highest potential wins the update
-					winner = actives[np.argmax(activations[actives])]
-					l1_updates[winner] += 1
+					winners = activations[actives]
+					#np.random.shuffle(winners)
+					winner = actives[np.argmax(winners)]
+					l1_updates[i, winner] += 1
 					# Hebbian learning rule
-					x = self._layer_1_weights[:, winner].copy()
 					self._layer_1_weights[:, winner] += layer_1_learning_rate * sample.reshape((sample.shape[0]*sample.shape[1],))
-					print(self._layer_1_weights[:, winner][self._layer_1_weights[:, winner] != x].shape)
-					print("----------------------------------------------------------")
+
 					# Weight normalization
 					self._layer_1_weights[:, winner] /= np.linalg.norm(self._layer_1_weights[:, winner])
 					# Homeostasis: increase the threshold of the winner
 					self._layer_1_thresholds[winner] = activations[winner]
+                    
 # previous version of homeostasis
 #					self._layer_1_thresholds[winner] *= 1. + layer_1_lr_th
 #					w_th = self._layer_1_thresholds[winner]
@@ -116,7 +122,14 @@ class SNN:
 					# Homeostasis: decrease all thresholds if no neuron was active
 					self._layer_1_thresholds[...] *= 1 - layer_1_lr_th/len(self._layer_1_thresholds)
 			#print(self._layer_1_thresholds, activations)
-		print(l1_updates)
+            
+			  
+			l1_weights_updates[i]   = np.linalg.norm(self._layer_1_weights - l1_old_weights, axis=0)
+			l1_threshold_updates[i] = self._layer_1_thresholds - l1_old_thresholds
+
+
+            
+		#print(l1_updates)
 
 		# set thresholds of layer 1 for inference
 		self._layer_1_thresholds[...] = 0.
@@ -171,3 +184,4 @@ class SNN:
 			activations = np.dot(np.sum(layer_1_history, axis=0), self._layer_2_weights)
 			self._layer_2_thresholds[...] = np.maximum(self._layer_2_thresholds, activations)
 		self._layer_2_thresholds *= .95
+		return l1_updates, l1_weights_updates, l1_threshold_updates
