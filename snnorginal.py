@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import copy
 
 # dead pixels
 # (62,125)
@@ -88,11 +89,11 @@ class SNN:
 		Layer-wise training of the network for a given training set.
 		'''
 		l1_updates = np.zeros(( layer_1_epochs, self._layer_1_thresholds.shape[0]), dtype=np.int32)
-		l1_weights_updates = np.zeros((layer_1_epochs, self._layer_1_weights.shape[1]), dtype=np.int32)
+		l1_weights_updates = np.zeros((layer_1_epochs, self._layer_1_weights.shape[1]), dtype=np.float32)
 		l1_threshold_updates = np.zeros((layer_1_epochs, self._layer_1_weights.shape[1]), dtype=np.int32)
     
 		for i in range(layer_1_epochs):
-			l1_old_weights  = self._layer_1_weights.copy()
+			l1_old_weights  = copy.deepcopy(self._layer_1_weights)
 			l1_old_thresholds = self._layer_1_thresholds.copy()
             
 			for sample in input_data:
@@ -102,7 +103,7 @@ class SNN:
 				if len(actives) > 0:
 					# Winner-takes-all: active neuron with highest potential wins the update
 					winners = activations[actives]
-					#np.random.shuffle(winners)
+					np.random.shuffle(winners)
 					winner = actives[np.argmax(winners)]
 					l1_updates[i, winner] += 1
 					# Hebbian learning rule
@@ -124,7 +125,7 @@ class SNN:
 			#print(self._layer_1_thresholds, activations)
             
 			  
-			l1_weights_updates[i]   = np.linalg.norm(self._layer_1_weights - l1_old_weights, axis=0)
+			l1_weights_updates[i]   = np.mean(self._layer_1_weights - l1_old_weights, axis=0)
 			l1_threshold_updates[i] = self._layer_1_thresholds - l1_old_thresholds
 
 
